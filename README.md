@@ -188,6 +188,33 @@ Estado actual del cliente: tras `npm audit` en el lockfile incluido → **0 vuln
 
 ---
 
+### Desplegar en Netlify
+
+El frontend PWA se despliega en Netlify; el backend Python (TTS) va aparte (Render, Railway, etc.).
+
+**Opción 1 — Desde GitHub (recomendado)**
+
+1. Sube el repo a https://github.com/JOEL0316/Audiolibros_Python
+2. En [app.netlify.com](https://app.netlify.com) → **Add new site** → **Import an existing project** → GitHub
+3. Elige el repo; Netlify detectará `netlify.toml` automáticamente
+4. **Site settings → Environment variables** (opcional):
+   - `VITE_API_URL` = URL pública de tu API TTS (si la tienes)
+5. **Deploy site**
+
+**Opción 2 — CLI local**
+
+```bash
+npm install -g netlify-cli
+netlify login
+cd /ruta/al/proyecto
+netlify init    # enlaza o crea sitio
+netlify deploy --prod --build
+```
+
+Sin `VITE_API_URL`, la app usa voz del navegador o intenta el fallback al servidor si está configurado.
+
+---
+
 ### Instalar como PWA en el móvil
 
 1. Build: `cd client && npm run build` (o `pnpm run build`).

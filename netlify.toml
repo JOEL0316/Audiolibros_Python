@@ -1,0 +1,28 @@
+# Despliegue del frontend PWA (carpeta client/)
+# https://docs.netlify.com/configure-builds/file-based-configuration/
+
+[build]
+  base = "client"
+  command = "npm ci && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Variables en el panel de Netlify (Site settings → Environment variables):
+# VITE_API_URL = https://tu-api-tts.ejemplo.com
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
