@@ -1,0 +1,33 @@
+# Dependencias
+node_modules/
+client/node_modules/
+server/.venv/
+server/__pycache__/
+server/**/__pycache__/
+
+# Build
+client/dist/
+*.local
+
+# Entorno
+.env
+.env.*
+!.env.example
+
+# Audio generado (caché local del servidor)
+server/audio_cache/
+client/public/generated/
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# PWA dev
+dev-dist/

@@ -1,0 +1,14 @@
+# Copia a client/.npmrc si usas npm (opcional, endurece la instalación)
+# cp .npmrc.example client/.npmrc
+
+# Evita scripts post-install (reduce ataques tipo Shai-Hulud).
+# NOTA: algunos paquetes (p. ej. esbuild) pueden requerir scripts.
+# Si `npm run build` falla, quita esta línea temporalmente o usa pnpm (ver README).
+ignore-scripts=true
+
+# No ejecutar git durante install
+allow-git=none
+
+# Menos ruido en install
+fund=false
+audit=true
