@@ -1,4 +1,5 @@
 import type { AppSettings } from '../types';
+import { audioPlayer } from './audioPlayerService';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -243,20 +244,8 @@ export function speakInBrowser(
   };
 }
 
+/** Reproduce con el reproductor global (soporta segundo plano + pantalla bloqueada) */
 export function playAudioBlob(blob: Blob, onEnd: () => void): () => void {
-  const url = URL.createObjectURL(blob);
-  const audio = new Audio(url);
-  audio.onended = () => {
-    URL.revokeObjectURL(url);
-    onEnd();
-  };
-  audio.onerror = () => {
-    URL.revokeObjectURL(url);
-    onEnd();
-  };
-  void audio.play().catch(() => onEnd());
-  return () => {
-    audio.pause();
-    URL.revokeObjectURL(url);
-  };
+  void audioPlayer.playBlob(blob, onEnd).catch(() => onEnd());
+  return () => audioPlayer.stop();
 }

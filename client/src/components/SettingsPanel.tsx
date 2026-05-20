@@ -75,8 +75,11 @@ export function SettingsPanel({ settings, open, onChange, onClose }: SettingsPan
             }
           >
             <option value="browser">Navegador (sin servidor)</option>
-            <option value="server">Servidor (mejor calidad)</option>
+            <option value="server">Servidor (pantalla bloqueada + bloqueo)</option>
           </select>
+          <p className="settings__status" style={{ marginTop: '0.35rem', color: 'var(--text-muted)' }}>
+            Para audio con pantalla apagada y controles en bloqueo, usa modo Servidor (Render).
+          </p>
           {settings.ttsMode === 'server' && (
             <p className={`settings__status ${serverOnline ? 'ok' : 'warn'}`}>
               {serverOnline ? 'Servidor conectado' : 'Servidor no disponible — inicia el backend'}

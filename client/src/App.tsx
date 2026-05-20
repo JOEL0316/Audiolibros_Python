@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BookList } from './components/BookList';
 import { FileUpload } from './components/FileUpload';
+import { InstallBanner } from './components/InstallBanner';
 import { PlayerControls } from './components/PlayerControls';
 import { SettingsPanel } from './components/SettingsPanel';
 import { useAudiobookPlayer } from './hooks/useAudiobookPlayer';
@@ -10,6 +11,7 @@ import {
   isBrowserTtsLikelyAvailable,
   isUnreachableLocalApi,
 } from './services/ttsService';
+import { isMobileDevice } from './services/mediaSessionService';
 import {
   deleteBook,
   getBook,
@@ -35,7 +37,7 @@ function App() {
 
   const player = useAudiobookPlayer({
     book: activeBook,
-    settings: settings ?? { ttsMode: 'browser', speechRate: 1, speechPitch: 1, serverVoice: 'es-ES-ElviraNeural' },
+    settings: settings ?? DEFAULT_SETTINGS,
   });
 
   const refreshLibrary = useCallback(async () => {
@@ -59,13 +61,20 @@ function App() {
       const serverOk = await checkServerHealth();
       const browserOk = await isBrowserTtsLikelyAvailable();
 
-      if (!serverOk && merged.ttsMode === 'server') {
+      if (serverOk) {
+        merged.ttsMode = 'server';
+        if (isMobileDevice()) {
+          setAppNotice(
+            'Modo servidor activo: audio en segundo plano y controles en pantalla de bloqueo.',
+          );
+        }
+      } else if (!serverOk && merged.ttsMode === 'server') {
         merged.ttsMode = 'browser';
         await saveSettings(merged);
         setAppNotice(
           isUnreachableLocalApi()
-            ? 'En Netlify no hay backend TTS. Se usa la voz del navegador. Para mejor voz, despliega el servidor y configura VITE_API_URL.'
-            : 'Servidor TTS no disponible. Se usa la voz del navegador.',
+            ? 'Configura VITE_API_URL con tu API en Render para voz en pantalla bloqueada.'
+            : 'Servidor TTS no disponible. Usando voz del navegador.',
         );
       } else if (serverOk && !browserOk && merged.ttsMode === 'browser') {
         merged.ttsMode = 'server';
@@ -118,16 +127,24 @@ function App() {
     await saveSettings(next);
   };
 
+  const showMiniPlayer =
+    activeBook && (player.status === 'playing' || player.status === 'paused');
+
   return (
     <div className="app">
       <header className="header">
-        <div>
-          <h1>Audiolibro PDF</h1>
-          <p className="header__subtitle">Lee con los ojos cerrados</p>
+        <div className="header__brand">
+          <span className="header__logo" aria-hidden>
+            🎧
+          </span>
+          <div>
+            <h1>Audiolibro PDF</h1>
+            <p className="header__subtitle">Escucha tus libros</p>
+          </div>
         </div>
         <button
           type="button"
-          className="btn btn--ghost"
+          className="btn btn--ghost btn--icon"
           onClick={() => setSettingsOpen(true)}
           aria-label="Ajustes"
         >
@@ -135,15 +152,18 @@ function App() {
         </button>
       </header>
 
+      <InstallBanner />
+
       <main className="main">
         <FileUpload onFileSelect={handleFile} loading={loading} progress={uploadProgress} />
+
         {loadError && <p className="error-banner">{loadError}</p>}
         {(appNotice || player.notice) && (
           <p className="info-banner">{player.notice ?? appNotice}</p>
         )}
 
-        <section className="section">
-          <h2>Biblioteca</h2>
+        <section className="card">
+          <h2 className="section-title">Biblioteca</h2>
           <BookList
             books={books}
             progressMap={progressMap}
@@ -154,14 +174,26 @@ function App() {
         </section>
 
         {activeBook && (
-          <section className="section reader">
-            <h2>{activeBook.title}</h2>
-            <p className="reader__text">{player.currentText || 'Página sin texto legible.'}</p>
+          <section className="card now-playing">
+            <h2 className="section-title">Reproduciendo</h2>
+            <div className="now-playing__art" aria-hidden>
+              📚
+            </div>
+            <h3 className="now-playing__title">{activeBook.title}</h3>
+            <p className="now-playing__page">
+              Página {player.currentPage} de {activeBook.totalPages} · {player.progressPercent}%
+            </p>
+            <p
+              className={`now-playing__text ${player.status === 'playing' ? 'now-playing__text--playing' : ''}`}
+            >
+              {player.currentText || 'Página sin texto legible.'}
+            </p>
             {player.error && <p className="error-banner">{player.error}</p>}
             <PlayerControls
               status={player.status}
               currentPage={player.currentPage}
               totalPages={activeBook.totalPages}
+              progressPercent={player.progressPercent}
               onPlay={player.play}
               onPause={player.pause}
               onStop={player.stop}
@@ -173,6 +205,26 @@ function App() {
         )}
       </main>
 
+      {showMiniPlayer && activeBook && (
+        <div className="mini-player">
+          <button
+            type="button"
+            className="player__btn-main"
+            style={{ width: 48, height: 48, fontSize: '1.1rem' }}
+            onClick={player.status === 'playing' ? player.pause : player.play}
+            aria-label={player.status === 'playing' ? 'Pausar' : 'Reproducir'}
+          >
+            {player.status === 'playing' ? '⏸' : '▶'}
+          </button>
+          <div className="mini-player__info">
+            <div className="mini-player__title">{activeBook.title}</div>
+            <div className="mini-player__sub">
+              Pág. {player.currentPage}/{activeBook.totalPages}
+            </div>
+          </div>
+        </div>
+      )}
+
       {settings && (
         <SettingsPanel
           settings={settings}
@@ -181,10 +233,6 @@ function App() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
-
-      <footer className="footer">
-        <p>Instala como app: menú del navegador → Instalar / Añadir a inicio</p>
-      </footer>
     </div>
   );
 }

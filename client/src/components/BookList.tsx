@@ -10,22 +10,38 @@ interface BookListProps {
 
 export function BookList({ books, progressMap, activeId, onSelect, onDelete }: BookListProps) {
   if (books.length === 0) {
-    return <p className="empty-hint">Aún no hay libros. Sube tu primer PDF arriba.</p>;
+    return (
+      <p className="empty-hint">
+        Tu biblioteca está vacía.
+        <br />
+        Sube un PDF para empezar a escuchar.
+      </p>
+    );
   }
 
   return (
     <ul className="book-list">
-      {books.map((book) => {
+      {books.map((book, i) => {
         const prog = progressMap[book.id];
-        const pct = prog
-          ? Math.round((prog.currentPage / book.totalPages) * 100)
-          : 0;
+        const pct = prog ? Math.round((prog.currentPage / book.totalPages) * 100) : 0;
         return (
-          <li key={book.id} className={activeId === book.id ? 'book-item--active' : ''}>
+          <li
+            key={book.id}
+            className={activeId === book.id ? 'book-item--active' : ''}
+            style={{ animationDelay: `${i * 0.04}s` }}
+          >
             <button type="button" className="book-item" onClick={() => onSelect(book.id)}>
-              <span className="book-item__title">{book.title}</span>
-              <span className="book-item__meta">
-                {book.totalPages} págs · {pct}% leído
+              <span className="book-item__cover" aria-hidden>
+                📖
+              </span>
+              <span className="book-item__info">
+                <span className="book-item__title">{book.title}</span>
+                <span className="book-item__meta">
+                  {book.totalPages} páginas · {pct}% escuchado
+                </span>
+                <span className="book-item__progress">
+                  <span className="book-item__progress-fill" style={{ width: `${pct}%` }} />
+                </span>
               </span>
             </button>
             <button

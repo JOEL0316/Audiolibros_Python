@@ -32,7 +32,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  ttsMode: 'browser',
+  ttsMode: 'server',
   speechRate: 1,
   speechPitch: 1,
   serverVoice: 'es-ES-ElviraNeural',

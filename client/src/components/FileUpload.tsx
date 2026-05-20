@@ -6,7 +6,7 @@ interface FileUploadProps {
 
 export function FileUpload({ onFileSelect, loading, progress }: FileUploadProps) {
   return (
-    <label className={`upload-zone ${loading ? 'upload-zone--loading' : ''}`}>
+    <label className={`upload-zone card ${loading ? 'upload-zone--loading' : ''}`}>
       <input
         type="file"
         accept="application/pdf,.pdf"
@@ -18,12 +18,12 @@ export function FileUpload({ onFileSelect, loading, progress }: FileUploadProps)
         }}
       />
       <span className="upload-icon" aria-hidden>
-        📄
+        {loading ? '⏳' : '📄'}
       </span>
       <span className="upload-title">
-        {loading ? 'Extrayendo texto del PDF…' : 'Toca para cargar un PDF'}
+        {loading ? 'Extrayendo texto…' : 'Toca para subir un PDF'}
       </span>
-      <span className="upload-hint">El archivo se procesa en tu dispositivo</span>
+      <span className="upload-hint">Se procesa en tu dispositivo · Privado y seguro</span>
       {loading && (
         <div className="progress-bar" role="progressbar" aria-valuenow={progress}>
           <span className="progress-bar__fill" style={{ width: `${progress}%` }} />

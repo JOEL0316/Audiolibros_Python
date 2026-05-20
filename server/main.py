@@ -9,15 +9,19 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(title="Audiolibro TTS API", version="1.0.0")
 
-origins = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173",
-).split(",")
+_default_origins = "http://localhost:5173,http://127.0.0.1:5173"
+_cors_raw = os.getenv("CORS_ORIGINS", _default_origins).strip()
+_allow_all = _cors_raw == "*" or os.getenv("CORS_ALLOW_ALL", "").lower() in ("1", "true", "yes")
+
+if _allow_all:
+    _origins = ["*"]
+else:
+    _origins = [o.strip() for o in _cors_raw.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in origins if o.strip()],
-    allow_credentials=True,
+    allow_origins=_origins,
+    allow_credentials=not _allow_all,
     allow_methods=["*"],
     allow_headers=["*"],
 )

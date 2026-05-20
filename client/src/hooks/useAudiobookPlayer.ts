@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { audioPlayer } from '../services/audioPlayerService';
+import {
+  clearMediaSession,
+  isMobileDevice,
+  updateMediaSession,
+} from '../services/mediaSessionService';
 import { splitIntoSentences } from '../services/pdfExtractor';
 import {
   checkServerHealth,
-  playAudioBlob,
   speakInBrowser,
   synthesizeServerAudio,
 } from '../services/ttsService';
@@ -22,8 +27,36 @@ export function useAudiobookPlayer({ book, settings }: UseAudiobookPlayerOptions
   const [sentenceIndex, setSentenceIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const stopRef = useRef<(() => void) | null>(null);
   const pausedRef = useRef(false);
+  const playSentenceRef = useRef<(page: number, idx: number) => void>(() => {});
+
+  const handlersRef = useRef({
+    play: () => {},
+    pause: () => {},
+    next: () => {},
+    prev: () => {},
+  });
+
+  useEffect(() => {
+    if (!book) {
+      clearMediaSession();
+      return;
+    }
+    updateMediaSession(
+      {
+        title: book.title,
+        artist: `Página ${currentPage} de ${book.totalPages}`,
+        album: 'Audiolibro PDF',
+      },
+      {
+        onPlay: () => handlersRef.current.play(),
+        onPause: () => handlersRef.current.pause(),
+        onNext: () => handlersRef.current.next(),
+        onPrevious: () => handlersRef.current.prev(),
+      },
+      status === 'playing',
+    );
+  }, [book, currentPage, status]);
 
   useEffect(() => {
     if (!book) return;
@@ -63,11 +96,11 @@ export function useAudiobookPlayer({ book, settings }: UseAudiobookPlayerOptions
   );
 
   const stop = useCallback(() => {
-    stopRef.current?.();
-    stopRef.current = null;
+    audioPlayer.stop();
     speechSynthesis.cancel();
     setStatus('idle');
     pausedRef.current = false;
+    clearMediaSession();
   }, []);
 
   const playSentence = useCallback(
@@ -80,7 +113,7 @@ export function useAudiobookPlayer({ book, settings }: UseAudiobookPlayerOptions
           setCurrentPage(nextPage);
           setSentenceIndex(0);
           await persistProgress(nextPage, 0);
-          void playSentence(nextPage, 0);
+          void playSentenceRef.current(nextPage, 0);
         } else {
           stop();
         }
@@ -93,7 +126,7 @@ export function useAudiobookPlayer({ book, settings }: UseAudiobookPlayerOptions
           setCurrentPage(nextPage);
           setSentenceIndex(0);
           await persistProgress(nextPage, 0);
-          void playSentence(nextPage, 0);
+          void playSentenceRef.current(nextPage, 0);
         } else {
           stop();
         }
@@ -109,65 +142,71 @@ export function useAudiobookPlayer({ book, settings }: UseAudiobookPlayerOptions
 
       const onEnd = () => {
         if (pausedRef.current) return;
-        const next = sIdx + 1;
-        void playSentence(page, next);
+        void playSentenceRef.current(page, sIdx + 1);
+      };
+
+      const playWithAudio = async (fallbackNotice?: string) => {
+        if (fallbackNotice) setNotice(fallbackNotice);
+        const serverOk = await checkServerHealth();
+        if (!serverOk) {
+          if (isMobileDevice()) {
+            setError(
+              'Para escuchar con pantalla apagada necesitas el servidor TTS (modo Servidor en ⚙).',
+            );
+            setStatus('idle');
+            return;
+          }
+          playBrowser(
+            'Servidor no disponible. La voz del navegador se detiene al bloquear la pantalla.',
+          );
+          return;
+        }
+        try {
+          const blob = await synthesizeServerAudio(text, settings);
+          if (fallbackNotice) setNotice(fallbackNotice);
+          else if (isMobileDevice()) {
+            setNotice('Audio en segundo plano: usa los controles de la pantalla de bloqueo.');
+          } else {
+            setNotice(null);
+          }
+          setStatus('playing');
+          await audioPlayer.playBlob(blob, onEnd);
+        } catch {
+          playBrowser('Error al generar audio. Usando voz del navegador.');
+        }
       };
 
       const playBrowser = (fallbackNotice?: string) => {
         if (fallbackNotice) setNotice(fallbackNotice);
-        stopRef.current?.();
+        if (isMobileDevice()) {
+          setNotice(
+            'En móvil, la voz del navegador se pausa al apagar la pantalla. Usa modo Servidor con backend activo.',
+          );
+        }
         setStatus('playing');
-        stopRef.current = speakInBrowser(
+        speakInBrowser(
           text,
           settings,
           onEnd,
           (msg) => {
-            void (async () => {
-              const serverOk = await checkServerHealth();
-              if (serverOk) {
-                try {
-                  setStatus('loading');
-                  const blob = await synthesizeServerAudio(text, settings);
-                  stopRef.current?.();
-                  setError(null);
-                  setNotice(null);
-                  setStatus('playing');
-                  stopRef.current = playAudioBlob(blob, onEnd);
-                  return;
-                } catch {
-                  /* mensaje del navegador abajo */
-                }
-              }
-              setError(msg);
-              setStatus('idle');
-            })();
+            void playWithAudio(msg);
           },
         );
       };
 
       try {
-        if (settings.ttsMode === 'server') {
+        const useServer =
+          settings.ttsMode === 'server' || (isMobileDevice() && (await checkServerHealth()));
+
+        if (useServer) {
+          await playWithAudio();
+        } else {
           const serverOk = await checkServerHealth();
           if (serverOk) {
-            try {
-              const blob = await synthesizeServerAudio(text, settings);
-              stopRef.current?.();
-              setNotice(null);
-              setStatus('playing');
-              stopRef.current = playAudioBlob(blob, onEnd);
-              return;
-            } catch {
-              playBrowser(
-                'El servidor TTS falló. Reproduciendo con la voz del navegador.',
-              );
-              return;
-            }
+            await playWithAudio();
+          } else {
+            playBrowser();
           }
-          playBrowser(
-            'Servidor TTS no disponible (normal en Netlify). Usando voz del navegador.',
-          );
-        } else {
-          playBrowser();
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Error de reproducción');
@@ -177,15 +216,22 @@ export function useAudiobookPlayer({ book, settings }: UseAudiobookPlayerOptions
     [book, getSentences, persistProgress, settings, stop],
   );
 
+  playSentenceRef.current = (page, idx) => {
+    void playSentence(page, idx);
+  };
+
   const play = useCallback(() => {
     pausedRef.current = false;
+    if (status === 'paused' && audioPlayer.element.src) {
+      void audioPlayer.resume().then(() => setStatus('playing'));
+      return;
+    }
     void playSentence(currentPage, sentenceIndex);
-  }, [currentPage, sentenceIndex, playSentence]);
+  }, [currentPage, sentenceIndex, playSentence, status]);
 
   const pause = useCallback(() => {
     pausedRef.current = true;
-    stopRef.current?.();
-    stopRef.current = null;
+    audioPlayer.pause();
     speechSynthesis.cancel();
     setStatus('paused');
   }, []);
@@ -231,12 +277,19 @@ export function useAudiobookPlayer({ book, settings }: UseAudiobookPlayerOptions
     [persistProgress, stop],
   );
 
+  handlersRef.current = { play, pause, next: skipForward, prev: skipBackward };
+
+  const progressPercent = book
+    ? Math.round((currentPage / book.totalPages) * 100)
+    : 0;
+
   return {
     status,
     currentPage,
     sentenceIndex,
     error,
     notice,
+    progressPercent,
     currentText: getSentences(currentPage)[sentenceIndex] ?? getPageText(currentPage),
     play,
     pause,

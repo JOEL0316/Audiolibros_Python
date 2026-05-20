@@ -1,0 +1,31 @@
+# Blueprint Render: backend TTS + frontend estático
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: audiolibro-tts
+    runtime: python
+    rootDir: server
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: TTS_VOICE
+        value: es-ES-ElviraNeural
+      - key: CORS_ORIGINS
+        sync: false
+
+  - type: web
+    name: audiolibro-app
+    runtime: static
+    plan: free
+    buildCommand: npm ci --prefix client && npm run build --prefix client
+    staticPublishPath: client/dist
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: VITE_API_URL
+        sync: false

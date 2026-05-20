@@ -188,7 +188,13 @@ Estado actual del cliente: tras `npm audit` en el lockfile incluido → **0 vuln
 
 ---
 
-### Desplegar en Netlify
+### Desplegar en Render (frontend + backend — recomendado)
+
+Guía completa: [docs/RENDER.md](docs/RENDER.md)
+
+Resumen: conecta el repo en Render → Blueprint (`render.yaml`) → configura `VITE_API_URL` y `CORS_ORIGINS` → redeploy.
+
+### Desplegar en Netlify (solo frontend)
 
 El frontend PWA se despliega en Netlify; el backend Python (TTS) va aparte (Render, Railway, etc.).
 
