@@ -5,7 +5,11 @@ import { PlayerControls } from './components/PlayerControls';
 import { SettingsPanel } from './components/SettingsPanel';
 import { useAudiobookPlayer } from './hooks/useAudiobookPlayer';
 import { extractTextFromPdf } from './services/pdfExtractor';
-import { checkServerHealth, isBrowserTtsLikelyAvailable } from './services/ttsService';
+import {
+  checkServerHealth,
+  isBrowserTtsLikelyAvailable,
+  isUnreachableLocalApi,
+} from './services/ttsService';
 import {
   deleteBook,
   getBook,
@@ -27,6 +31,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [appNotice, setAppNotice] = useState<string | null>(null);
 
   const player = useAudiobookPlayer({
     book: activeBook,
@@ -54,7 +59,15 @@ function App() {
       const serverOk = await checkServerHealth();
       const browserOk = await isBrowserTtsLikelyAvailable();
 
-      if (serverOk && !browserOk && merged.ttsMode === 'browser') {
+      if (!serverOk && merged.ttsMode === 'server') {
+        merged.ttsMode = 'browser';
+        await saveSettings(merged);
+        setAppNotice(
+          isUnreachableLocalApi()
+            ? 'En Netlify no hay backend TTS. Se usa la voz del navegador. Para mejor voz, despliega el servidor y configura VITE_API_URL.'
+            : 'Servidor TTS no disponible. Se usa la voz del navegador.',
+        );
+      } else if (serverOk && !browserOk && merged.ttsMode === 'browser') {
         merged.ttsMode = 'server';
         await saveSettings(merged);
       }
@@ -125,6 +138,9 @@ function App() {
       <main className="main">
         <FileUpload onFileSelect={handleFile} loading={loading} progress={uploadProgress} />
         {loadError && <p className="error-banner">{loadError}</p>}
+        {(appNotice || player.notice) && (
+          <p className="info-banner">{player.notice ?? appNotice}</p>
+        )}
 
         <section className="section">
           <h2>Biblioteca</h2>

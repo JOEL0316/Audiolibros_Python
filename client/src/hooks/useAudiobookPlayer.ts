@@ -21,6 +21,7 @@ export function useAudiobookPlayer({ book, settings }: UseAudiobookPlayerOptions
   const [currentPage, setCurrentPage] = useState(1);
   const [sentenceIndex, setSentenceIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
   const pausedRef = useRef(false);
 
@@ -112,46 +113,61 @@ export function useAudiobookPlayer({ book, settings }: UseAudiobookPlayerOptions
         void playSentence(page, next);
       };
 
+      const playBrowser = (fallbackNotice?: string) => {
+        if (fallbackNotice) setNotice(fallbackNotice);
+        stopRef.current?.();
+        setStatus('playing');
+        stopRef.current = speakInBrowser(
+          text,
+          settings,
+          onEnd,
+          (msg) => {
+            void (async () => {
+              const serverOk = await checkServerHealth();
+              if (serverOk) {
+                try {
+                  setStatus('loading');
+                  const blob = await synthesizeServerAudio(text, settings);
+                  stopRef.current?.();
+                  setError(null);
+                  setNotice(null);
+                  setStatus('playing');
+                  stopRef.current = playAudioBlob(blob, onEnd);
+                  return;
+                } catch {
+                  /* mensaje del navegador abajo */
+                }
+              }
+              setError(msg);
+              setStatus('idle');
+            })();
+          },
+        );
+      };
+
       try {
         if (settings.ttsMode === 'server') {
-          const ok = await checkServerHealth();
-          if (!ok) throw new Error('Servidor TTS no disponible. Activa el backend o usa voz del navegador.');
-          const blob = await synthesizeServerAudio(text, settings);
-          stopRef.current?.();
-          setStatus('playing');
-          stopRef.current = playAudioBlob(blob, onEnd);
-        } else {
-          stopRef.current?.();
-          setStatus('playing');
-          stopRef.current = speakInBrowser(
-            text,
-            settings,
-            onEnd,
-            (msg) => {
-              void (async () => {
-                const serverOk = await checkServerHealth();
-                if (serverOk) {
-                  try {
-                    setStatus('loading');
-                    const blob = await synthesizeServerAudio(text, settings);
-                    stopRef.current?.();
-                    setError(null);
-                    setStatus('playing');
-                    stopRef.current = playAudioBlob(blob, onEnd);
-                    return;
-                  } catch {
-                    /* sigue con el mensaje del navegador */
-                  }
-                }
-                setError(
-                  serverOk
-                    ? `${msg} (tampoco pudo usar el servidor)`
-                    : `${msg} Inicia el backend o en ⚙ elige «Servidor».`,
-                );
-                setStatus('idle');
-              })();
-            },
+          const serverOk = await checkServerHealth();
+          if (serverOk) {
+            try {
+              const blob = await synthesizeServerAudio(text, settings);
+              stopRef.current?.();
+              setNotice(null);
+              setStatus('playing');
+              stopRef.current = playAudioBlob(blob, onEnd);
+              return;
+            } catch {
+              playBrowser(
+                'El servidor TTS falló. Reproduciendo con la voz del navegador.',
+              );
+              return;
+            }
+          }
+          playBrowser(
+            'Servidor TTS no disponible (normal en Netlify). Usando voz del navegador.',
           );
+        } else {
+          playBrowser();
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Error de reproducción');
@@ -220,6 +236,7 @@ export function useAudiobookPlayer({ book, settings }: UseAudiobookPlayerOptions
     currentPage,
     sentenceIndex,
     error,
+    notice,
     currentText: getSentences(currentPage)[sentenceIndex] ?? getPageText(currentPage),
     play,
     pause,

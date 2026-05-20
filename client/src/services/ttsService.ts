@@ -2,6 +2,23 @@ import type { AppSettings } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
+export function getTtsApiUrl(): string {
+  return API_URL;
+}
+
+/** En producción (Netlify) localhost nunca funcionará como API */
+export function isUnreachableLocalApi(): boolean {
+  try {
+    const host = new URL(API_URL).hostname;
+    return (
+      import.meta.env.PROD &&
+      (host === 'localhost' || host === '127.0.0.1')
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Máximo de caracteres por utterance (límite de algunos navegadores) */
 const MAX_BROWSER_CHARS = 280;
 
