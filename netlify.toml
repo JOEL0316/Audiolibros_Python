@@ -1,16 +1,14 @@
-# Despliegue del frontend PWA (carpeta client/)
-# https://docs.netlify.com/configure-builds/file-based-configuration/
+# Netlify: build desde la raíz del monorepo
+# Si en el panel tienes valores manuales, bórralos o usa estos mismos.
 
 [build]
-  base = "client"
-  command = "npm ci && npm run build"
-  publish = "dist"
+  command = "npm run build"
+  publish = "client/dist"
 
 [build.environment]
   NODE_VERSION = "20"
 
-# Variables en el panel de Netlify (Site settings → Environment variables):
-# VITE_API_URL = https://tu-api-tts.ejemplo.com
+# VITE_API_URL = URL de tu API TTS (opcional, en el panel de Netlify)
 
 [[redirects]]
   from = "/*"
