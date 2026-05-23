@@ -15,6 +15,28 @@ export function isMediaSessionSupported(): boolean {
   return 'mediaSession' in navigator;
 }
 
+function getDefaultArtwork(): MediaImage[] {
+  if (typeof window === 'undefined') return [];
+  return [
+    {
+      src: `${window.location.origin}/icons/icon-512.png`,
+      sizes: '512x512',
+      type: 'image/png',
+    },
+  ];
+}
+
+function setMediaSessionAction(
+  action: MediaSessionAction,
+  handler: MediaSessionActionHandler | null,
+) {
+  try {
+    navigator.mediaSession.setActionHandler(action, handler);
+  } catch {
+    /* Algunos navegadores no soportan todas las acciones */
+  }
+}
+
 export function updateMediaSession(
   meta: MediaSessionMeta,
   handlers: MediaSessionHandlers,
@@ -26,20 +48,18 @@ export function updateMediaSession(
     title: meta.title,
     artist: meta.artist,
     album: meta.album ?? 'Audiolibro PDF',
+    artwork: getDefaultArtwork(),
   });
 
   navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
 
-  try {
-    navigator.mediaSession.setActionHandler('play', handlers.onPlay);
-    navigator.mediaSession.setActionHandler('pause', handlers.onPause);
-    navigator.mediaSession.setActionHandler('nexttrack', handlers.onNext);
-    navigator.mediaSession.setActionHandler('previoustrack', handlers.onPrevious);
-    navigator.mediaSession.setActionHandler('seekforward', handlers.onNext);
-    navigator.mediaSession.setActionHandler('seekbackward', handlers.onPrevious);
-  } catch {
-    /* Algunos navegadores no soportan todas las acciones */
-  }
+  setMediaSessionAction('play', handlers.onPlay);
+  setMediaSessionAction('pause', handlers.onPause);
+  setMediaSessionAction('stop', handlers.onPause);
+  setMediaSessionAction('nexttrack', handlers.onNext);
+  setMediaSessionAction('previoustrack', handlers.onPrevious);
+  setMediaSessionAction('seekforward', handlers.onNext);
+  setMediaSessionAction('seekbackward', handlers.onPrevious);
 }
 
 export function clearMediaSession(): void {
@@ -49,6 +69,7 @@ export function clearMediaSession(): void {
   const actions = [
     'play',
     'pause',
+    'stop',
     'nexttrack',
     'previoustrack',
     'seekforward',

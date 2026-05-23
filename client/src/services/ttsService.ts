@@ -23,6 +23,36 @@ export function isUnreachableLocalApi(): boolean {
 /** Máximo de caracteres por utterance (límite de algunos navegadores) */
 const MAX_BROWSER_CHARS = 280;
 
+function splitTextIntoChunks(text: string, maxChars: number): string[] {
+  const cleaned = text.replace(/\s+/g, ' ').trim();
+  if (cleaned.length <= maxChars) return cleaned ? [cleaned] : [];
+
+  const chunks: string[] = [];
+  let remaining = cleaned;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxChars) {
+      chunks.push(remaining);
+      break;
+    }
+
+    let part = remaining.slice(0, maxChars);
+    const lastSpace = part.lastIndexOf(' ');
+    if (lastSpace > Math.floor(maxChars * 0.5)) {
+      part = part.slice(0, lastSpace);
+    }
+
+    if (!part) {
+      part = remaining.slice(0, maxChars);
+    }
+
+    chunks.push(part.trim());
+    remaining = remaining.slice(part.length).trimStart();
+  }
+
+  return chunks;
+}
+
 let activeUtteranceId = 0;
 let chromeKeepAliveTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -157,9 +187,7 @@ function stopChromeKeepAlive() {
 }
 
 function normalizeForBrowser(text: string): string {
-  const trimmed = text.trim();
-  if (trimmed.length <= MAX_BROWSER_CHARS) return trimmed;
-  return `${trimmed.slice(0, MAX_BROWSER_CHARS)}…`;
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 export function speakInBrowser(
@@ -203,18 +231,33 @@ export function speakInBrowser(
       return;
     }
 
+    const chunks = splitTextIntoChunks(normalized, MAX_BROWSER_CHARS);
+    if (chunks.length === 0) {
+      safeEnd();
+      return;
+    }
+
     speechSynthesis.cancel();
 
-    window.setTimeout(() => {
-      if (utteranceId !== activeUtteranceId) return;
+    let currentIndex = 0;
+    const speakChunk = () => {
+      if (utteranceId !== activeUtteranceId || ended) return;
+      if (currentIndex >= chunks.length) {
+        safeEnd();
+        return;
+      }
 
-      const utterance = new SpeechSynthesisUtterance(normalized);
+      const utterance = new SpeechSynthesisUtterance(chunks[currentIndex]);
       utterance.lang = voice?.lang ?? 'es-ES';
       utterance.rate = Math.min(2, Math.max(0.5, settings.speechRate));
       utterance.pitch = Math.min(2, Math.max(0.5, settings.speechPitch));
       if (voice) utterance.voice = voice;
 
-      utterance.onend = () => safeEnd();
+      utterance.onend = () => {
+        if (utteranceId !== activeUtteranceId || ended) return;
+        currentIndex += 1;
+        speakChunk();
+      };
       utterance.onerror = (event: SpeechSynthesisErrorEvent) => {
         if (utteranceId !== activeUtteranceId) return;
         if (isBenignError(event.error)) return;
@@ -234,6 +277,11 @@ export function speakInBrowser(
           }
         }, 400);
       }
+    };
+
+    window.setTimeout(() => {
+      if (utteranceId !== activeUtteranceId) return;
+      speakChunk();
     }, 80);
   })();
 

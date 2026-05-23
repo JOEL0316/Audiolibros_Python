@@ -8,6 +8,7 @@ class AudioPlayerService {
     this.audio = new Audio();
     this.audio.preload = 'auto';
     this.audio.setAttribute('playsinline', 'true');
+    this.audio.setAttribute('webkit-playsinline', 'true');
     this.audio.crossOrigin = 'anonymous';
     this.audio.addEventListener('ended', () => this.onEnd?.());
     this.audio.addEventListener('error', () => this.onEnd?.());

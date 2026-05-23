@@ -65,7 +65,7 @@ function App() {
         merged.ttsMode = 'server';
         if (isMobileDevice()) {
           setAppNotice(
-            'Modo servidor activo: audio en segundo plano y controles en pantalla de bloqueo.',
+            'Modo servidor activo: instala la PWA para audio en segundo plano y controles en bloqueo.',
           );
         }
       } else if (!serverOk && merged.ttsMode === 'server') {

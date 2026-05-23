@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(title="Audiolibro TTS API", version="1.0.0")
 
-_default_origins = "http://localhost:5173,http://127.0.0.1:5173"
+_default_origins = "*"
 _cors_raw = os.getenv("CORS_ORIGINS", _default_origins).strip()
 _allow_all = _cors_raw == "*" or os.getenv("CORS_ALLOW_ALL", "").lower() in ("1", "true", "yes")
 
@@ -33,8 +33,43 @@ MAX_CHARS = int(os.getenv("TTS_MAX_CHARS_PER_CHUNK", "4000"))
 DEFAULT_VOICE = os.getenv("TTS_VOICE", "es-ES-ElviraNeural")
 
 
+def split_text_into_chunks(text: str, max_chars: int) -> list[str]:
+    words = text.split(' ')
+    chunks: list[str] = []
+    current = ''
+
+    for word in words:
+        if not current:
+            current = word
+            continue
+
+        if len(current) + 1 + len(word) <= max_chars:
+            current = f"{current} {word}"
+            continue
+
+        chunks.append(current)
+        current = word
+
+    if current:
+        chunks.append(current)
+
+    result: list[str] = []
+    for chunk in chunks:
+        if len(chunk) <= max_chars:
+            result.append(chunk)
+            continue
+
+        start = 0
+        while start < len(chunk):
+            end = min(start + max_chars, len(chunk))
+            result.append(chunk[start:end])
+            start = end
+
+    return result
+
+
 class SynthesizeRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=MAX_CHARS)
+    text: str = Field(..., min_length=1)
     voice: str = DEFAULT_VOICE
 
 
@@ -56,12 +91,18 @@ async def synthesize(body: SynthesizeRequest):
     if not text:
         raise HTTPException(status_code=400, detail="Texto vacío")
 
+    if len(text) > MAX_CHARS:
+        chunks = split_text_into_chunks(text, MAX_CHARS)
+    else:
+        chunks = [text]
+
     try:
-        communicate = edge_tts.Communicate(text, body.voice)
         audio_bytes = b""
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                audio_bytes += chunk["data"]
+        for chunk in chunks:
+            communicate = edge_tts.Communicate(chunk, body.voice)
+            async for part in communicate.stream():
+                if part["type"] == "audio":
+                    audio_bytes += part["data"]
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
