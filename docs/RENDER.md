@@ -56,6 +56,7 @@ Copia la URL del API, ej: `https://audiolibro-tts.onrender.com`
 - Root: `server`
 - Build: `pip install -r requirements.txt`
 - Start: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+- Plan: **starter** (Render ya no ofrece `free` para Web Service)
 
 ### Web
 
