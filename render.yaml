@@ -18,9 +18,9 @@ services:
       - key: CORS_ORIGINS
         sync: false
 
-  - type: web
+  - type: static
     name: audiolibro-app
-    runtime: static
+    rootDir: .
     plan: free
     buildCommand: npm ci --prefix client && npm run build --prefix client
     staticPublishPath: client/dist
