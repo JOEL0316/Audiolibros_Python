@@ -22,7 +22,7 @@ services:
     name: audiolibro-app
     runtime: static
     rootDir: client
-    plan: free
+    plan: starter
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
     envVars:
